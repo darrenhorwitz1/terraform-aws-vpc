@@ -13,9 +13,28 @@ output "transit_gateway_attachment_id" {
   value       = try(aws_ec2_transit_gateway_vpc_attachment.tgw[0].id, null)
 }
 
+output "transit_gateway_route_table_id" {
+  description = "Transit Gateway Route Table ID"
+  value       = try(aws_ec2_transit_gateway_route_table.tgw[0].id, null)
+}
+
 output "core_network_attachment" {
   description = "AWS Cloud WAN's core network attachment. Full output of aws_networkmanager_vpc_attachment."
   value       = try(aws_networkmanager_vpc_attachment.cwan[0], null)
+}
+
+
+
+output "private_subnet_ids" {
+  #  value =  aws_subnet.private.*.id
+  #  for_each = aws_subnet.private
+  value = {
+    for k, v in aws_subnet.private : k => v.id
+  }
+}
+
+output "public_subnet_ids" {
+  value = try(aws_subnet.public.*.id, null)
 }
 
 output "private_subnet_attributes_by_az" {
@@ -25,7 +44,7 @@ output "private_subnet_attributes_by_az" {
 
   Example:
   ```
-  private_subnet_attributes_by_az = {
+  private_subnet_attributes = {
     "private/us-east-1a" = {
       "arn" = "arn:aws:ec2:us-east-1:<>:subnet/subnet-04a86315c4839b519"
       "assign_ipv6_address_on_creation" = false
@@ -45,7 +64,7 @@ output "public_subnet_attributes_by_az" {
 
   Example:
   ```
-  public_subnet_attributes_by_az = {
+  public_subnet_attributes = {
     "us-east-1a" = {
       "arn" = "arn:aws:ec2:us-east-1:<>:subnet/subnet-04a86315c4839b519"
       "assign_ipv6_address_on_creation" = false
@@ -65,7 +84,7 @@ output "tgw_subnet_attributes_by_az" {
 
   Example:
   ```
-  tgw_subnet_attributes_by_az = {
+  tgw_subnet_attributes = {
     "us-east-1a" = {
       "arn" = "arn:aws:ec2:us-east-1:<>:subnet/subnet-04a86315c4839b519"
       "assign_ipv6_address_on_creation" = false
@@ -85,7 +104,7 @@ output "core_network_subnet_attributes_by_az" {
 
   Example:
   ```
-  core_network_subnet_attributes_by_az = {
+  core_network_subnet_attributes = {
     "us-east-1a" = {
       "arn" = "arn:aws:ec2:us-east-1:<>:subnet/subnet-04a86315c4839b519"
       "assign_ipv6_address_on_creation" = false
@@ -107,14 +126,15 @@ output "rt_attributes_by_type_by_az" {
     "core_network"    = aws_route_table.cwan
   }
   description = <<-EOF
-  Map of route tables by type => az => route table attributes. Example usage: module.vpc.rt_attributes_by_type_by_az.private.id
+  Map of route tables by type => az => route table attributes. Example usage: module.vpc.route_table_by_subnet_type.private.id
 
   Example:
   ```
-  rt_attributes_by_type_by_az = {
+  route_table_attributes_by_type_by_az = {
     "private" = {
       "us-east-1a" = {
         "id" = "rtb-0e77040c0598df003"
+        "route_table_id" = "rtb-0e77040c0598df003"
         "tags" = tolist([
           {
             "key" = "Name"
@@ -122,8 +142,6 @@ output "rt_attributes_by_type_by_az" {
           },
         ])
         "vpc_id" = "vpc-033e054f49409592a"
-        ...
-        <all attributes of route: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/route_table#attributes-reference>
       }
       "us-east-1b" = { ... }
     "public" = { ... }
@@ -180,16 +198,24 @@ EOF
 }
 
 output "internet_gateway" {
-  value       = try(aws_internet_gateway.main[0], null)
+  value       = try(aws_internet_gateway.main, null)
+  description = "Internet gateway attributes. Full output of aws_internet_gateway."
+}
+output "internet_gateway_id" {
+  value       = try(aws_internet_gateway.main[0].id, null)
   description = "Internet gateway attributes. Full output of aws_internet_gateway."
 }
 
 output "egress_only_internet_gateway" {
-  value       = try(aws_egress_only_internet_gateway.eigw[0], null)
+  value       = try(aws_egress_only_internet_gateway.eigw, null)
   description = "Egress-only Internet gateway attributes. Full output of aws_egress_only_internet_gateway."
 }
 
-output "vpc_lattice_service_network_association" {
-  value       = try(aws_vpclattice_service_network_vpc_association.vpc_lattice_service_network_association[0], null)
-  description = "VPC Lattice Service Network VPC association. Full output of aws_vpclattice_service_network_vpc_association"
+output "default_security_group_id" {
+  value = try(aws_default_security_group.default[0].id, null)
 }
+
+# output "vpc_flow_log_arn" {
+#   value = try(module.flow_logs[0].vpc_flow_log_arn, null)
+# }
+ 

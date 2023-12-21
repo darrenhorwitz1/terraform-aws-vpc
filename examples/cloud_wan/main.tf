@@ -1,9 +1,8 @@
 
 # VPC module (North Virginia)
 module "nvirginia_vpc" {
-  source  = "aws-ia/vpc/aws"
-  version = ">= 4.2.0"
-
+  source    = "aws-ia/vpc/aws"
+  version   = ">= 4.2.0"
   providers = { aws = aws.awsnvirginia }
 
   name                                 = "nvirginia-vpc"
@@ -43,9 +42,8 @@ module "nvirginia_vpc" {
 
 # VPC module (Ireland)
 module "ireland_vpc" {
-  source  = "aws-ia/vpc/aws"
-  version = ">= 4.2.0"
-
+  source    = "aws-ia/vpc/aws"
+  version   = ">= 4.2.0"
   providers = { aws = aws.awsireland }
 
   name                                 = "ireland-vpc"
@@ -63,6 +61,7 @@ module "ireland_vpc" {
   core_network_ipv6_routes = {
     workload = "::/0"
   }
+
   subnets = {
     workload = {
       netmask          = 28

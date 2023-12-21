@@ -4,6 +4,10 @@ terraform {
     aws = {
       source  = "hashicorp/aws"
       version = ">= 4.27.0"
+      configuration_aliases = [
+        aws.network,
+        aws.network_cwan_ram
+      ]
     }
   }
 }

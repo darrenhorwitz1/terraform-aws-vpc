@@ -1,10 +1,15 @@
-variable "name" {
+variable "naming_prefix" {
   type        = string
   description = "Name to give VPC. Note: does not effect subnet names, which get assigned name based on name_prefix."
 }
+variable "naming_prefixes" {
+  type        = any
+  description = "Landing zone naming prefixes"
+  default     = {}
+}
 
 variable "cidr_block" {
-  description = "IPv4 CIDR range to assign to VPC if creating VPC or to associate as a secondary IPv6 CIDR. Overridden by var.vpc_id output from data.aws_vpc."
+  description = "IPv4 CIDR range to assign to VPC if creating VPC or to associte as a secondary IPv6 CIDR. Overridden by var.vpc_id output from data.aws_vpc."
   default     = null
   type        = string
 }
@@ -18,6 +23,12 @@ variable "vpc_id" {
 variable "az_count" {
   type        = number
   description = "Searches region for # of AZs to use and takes a slice based on count. Assume slice is sorted a-z."
+  default     = null
+}
+variable "azs" {
+  type        = list(string)
+  description = "List of azs to use , this is if you need to use specific azs that differ from their az-id"
+  default     = null
 }
 
 variable "vpc_enable_dns_hostnames" {
@@ -73,7 +84,7 @@ variable "vpc_ipv4_netmask_length" {
 }
 
 variable "vpc_assign_generated_ipv6_cidr_block" {
-  description = "Requests and Amazon-provided IPv6 CIDR block with a /56 prefix length. You cannot specify the range of IP addresses, or the size of the CIDR block. Conflicts with `vpc_ipv6_ipam_pool_id`."
+  description = "Requests and Amazon-provided IPv6 CIDR block with a /56 prefix length. You cannot specify the range of IP addresses, or the size of the CIDR block. Conflics with `vpc_ipv6_ipam_pool_id`."
   type        = bool
   default     = null
 }
@@ -85,7 +96,7 @@ variable "vpc_ipv6_ipam_pool_id" {
 }
 
 variable "vpc_ipv6_cidr_block" {
-  description = "IPv6 CIDR range to assign to VPC if creating VPC. You need to use `vpc_ipv6_ipam_pool_id` and set explicitly the CIDR block to use, or derived from IPAM using using `vpc_ipv6_netmask_length`."
+  description = "IPv6 CIDR range to assign to VPC if creating VPC. You need to use `vpc_ipv6_ipam_pool_id` and set explicitly the CIDR block to use, or derived from IPAM using using `vpc_ipv6_netmask_lenght`."
   type        = string
   default     = null
 }
@@ -108,6 +119,7 @@ variable "subnets" {
 
   **Attributes shared across subnet types:**
   - `cidrs`            = (Optional|list(string)) **Cannot set if `netmask` is set.** List of IPv4 CIDRs to set to subnets. Count of CIDRs defined must match quantity of azs in `az_count`.
+  - `azs`              = (Optional|list(string)) List of availability zones to set to subnets. If `azs` is not set , the default value be derived from either `az_count` or `azs`.
   - `netmask`          = (Optional|Int) **Cannot set if `cidrs` is set.** Netmask of the `var.cidr_block` to calculate for each subnet.
   - `assign_ipv6_cidr` = (Optional|bool) **Cannot set if `ipv6_cidrs` is set.** If true, it will calculate a /64 block from the IPv6 VPC CIDR to set in the subnets.
   - `ipv6_cidrs`       = (Optional|list(string)) **Cannot set if `assign_ipv6_cidr` is set.** List of IPv6 CIDRs to set to subnets. The subnet size must use a /64 prefix length. Count of CIDRs defined must match quantity of azs in `az_count`.
@@ -185,12 +197,16 @@ EOF
 
   # All var.subnets.public valid keys
   validation {
-    error_message = "Invalid key in public subnets. Valid options include: \"cidrs\", \"netmask\", \"name_prefix\", \"connect_to_igw\", \"nat_gateway_configuration\", \"ipv6_native\", \"assign_ipv6_cidr\", \"ipv6_cidrs\", \"tags\"."
+    error_message = "Invalid key in public subnets. Valid options include: \"cidrs\", \"azs\", \"netmask\", \"name_prefix\", \"connect_to_igw\",\"routes_to_igw\",\"shared\", \"associated_principals\",\"nat_gateway_configuration\", \"ipv6_native\", \"assign_ipv6_cidr\", \"ipv6_cidrs\", \"tags\"."
     condition = length(setsubtract(keys(try(var.subnets.public, {})), [
       "cidrs",
+      "azs",
       "netmask",
       "name_prefix",
       "connect_to_igw",
+      "routes_to_igw",
+      "shared",
+      "associated_principals",
       "nat_gateway_configuration",
       "ipv6_native",
       "assign_ipv6_cidr",
@@ -201,9 +217,10 @@ EOF
 
   # All var.subnets.transit_gateway valid keys
   validation {
-    error_message = "Invalid key in transit_gateway subnets. Valid options include: \"cidrs\", \"netmask\", \"name_prefix\", \"connect_to_public_natgw\", \"assign_ipv6_cidr\", \"ipv6_cidrs\", \"transit_gateway_default_route_table_association\", \"transit_gateway_default_route_table_propagation\", \"transit_gateway_appliance_mode_support\", \"transit_gateway_dns_support\", \"tags\"."
+    error_message = "Invalid key in transit_gateway subnets. Valid options include: \"cidrs\", \"azs\", \"netmask\", \"name_prefix\", \"connect_to_public_natgw\", \"assign_ipv6_cidr\", \"ipv6_cidrs\", \"transit_gateway_default_route_table_association\", \"transit_gateway_default_route_table_propagation\", \"transit_gateway_appliance_mode_support\", \"transit_gateway_dns_support\", \"resource_share_arn\",\"tags\"."
     condition = length(setsubtract(keys(try(var.subnets.transit_gateway, {})), [
       "cidrs",
+      "azs",
       "netmask",
       "name_prefix",
       "connect_to_public_natgw",
@@ -213,15 +230,17 @@ EOF
       "transit_gateway_default_route_table_propagation",
       "transit_gateway_appliance_mode_support",
       "transit_gateway_dns_support",
+      "resource_share_arn",
       "tags"
     ])) == 0
   }
 
   # All var.subnets.core_network valid keys
   validation {
-    error_message = "Invalid key in core_network subnets. Valid options include: \"cidrs\", \"netmask\", \"name_prefix\", \"connect_to_public_natgw\", \"assign_ipv6_cidr\", \"ipv6_cidrs\", \"appliance_mode_support\", \"require_acceptance\", \"accept_attachment\", \"tags\"."
+    error_message = "Invalid key in core_network subnets. Valid options include: \"cidrs\", \"azs\",\"netmask\", \"name_prefix\", \"connect_to_public_natgw\", \"assign_ipv6_cidr\", \"ipv6_cidrs\", \"appliance_mode_support\", \"require_acceptance\", \"accept_attachment\", \"resource_share_arn\", \"tags\"."
     condition = length(setsubtract(keys(try(var.subnets.core_network, {})), [
       "cidrs",
+      "azs",
       "netmask",
       "name_prefix",
       "connect_to_public_natgw",
@@ -230,6 +249,23 @@ EOF
       "appliance_mode_support",
       "require_acceptance",
       "accept_attachment",
+      "resource_share_arn",
+      "tags"
+    ])) == 0
+  }
+
+
+  validation {
+    error_message = "Invalid key in gateway_lb subnets. Valid options include: \"cidrs\", \"azs\", \"netmask\", \"name_prefix\", \"gwlb_endpoint_service_name\", \"ipv6_native\", \"assign_ipv6_cidr\", \"ipv6_cidrs\", \"tags\"."
+    condition = length(setsubtract(keys(try(var.subnets.gateway_lb, {})), [
+      "cidrs",
+      "azs",
+      "netmask",
+      "name_prefix",
+      "gwlb_endpoint_service_name",
+      "ipv6_native",
+      "assign_ipv6_cidr",
+      "ipv6_cidrs",
       "tags"
     ])) == 0
   }
@@ -238,6 +274,12 @@ EOF
     error_message = "Each subnet type must contain only 1 key: `cidrs` or `netmask` or `ipv6_native`."
     condition     = alltrue([for subnet_type, v in var.subnets : length(setintersection(keys(v), ["cidrs", "netmask", "ipv6_native"])) == 1])
   }
+
+  ## TODO RESOURCE SHARE VALIDATION
+  # validation {
+  #   error_message = "Each subnet type must contain only 1 key: `cidrs` or `netmask` or `ipv6_native`."
+  #   condition     = alltrue([for subnet_type, v in var.subnets : length(setintersection(keys(v), ["cidrs", "netmask", "ipv6_native"])) == 1])
+  # }
 
   validation {
     error_message = "Public subnet `nat_gateway_configuration` can only be `all_azs`, `single_az`, `none`, or `null`."
@@ -284,10 +326,21 @@ variable "vpc_flow_logs" {
     error_message = "Invalid input, options: \"cloud-watch-logs\", \"s3\", or \"none\"."
   }
 }
+variable "vpc_flow_log_destination_arn" {
+  description = "s3 logging bucket arn in the account used to store logs"
+  type        = string
+  default     = ""
+}
+
 
 variable "transit_gateway_id" {
   type        = string
   description = "Transit gateway id to attach the VPC to. Required when `transit_gateway` subnet is defined."
+  default     = null
+}
+variable "transit_gateway_resource_share_arn" {
+  type        = string
+  description = "Ramshare resource share used for tgw that is shared with this account. Required when `transit_gateway` subnet is defined."
   default     = null
 }
 
@@ -327,14 +380,22 @@ EOF
 
 variable "core_network" {
   type = object({
-    id  = string
-    arn = string
+    id                     = string
+    arn                    = string
+    resource_share_arn     = optional(string)
+    appliance_mode_support = optional(bool, false)
+    attachment_tags        = optional(map(string), {})
+    attachment_subnet      = optional(string)
+    require_acceptance     = optional(bool, false)
   })
   description = "AWS Cloud WAN's core network information - to create a VPC attachment. Required when `cloud_wan` subnet is defined. Two attributes are required: the `id` and `arn` of the resource."
 
   default = {
     id  = null
     arn = null
+    # resource_share_arn     = null
+    # appliance_mode_support = null
+    # attachment_subnet      = null
   }
 }
 
@@ -370,27 +431,4 @@ variable "core_network_ipv6_routes" {
 EOF
   type        = any
   default     = {}
-}
-
-variable "vpc_lattice" {
-  description = <<-EOF
-  Amazon VPC Lattice Service Network VPC association. You can only associate one Service Network to the VPC. This association also support Security Groups (more than 1).
-  This variable expects the following attributes:
-  - `service_network_identifier` = (Required|string) The ID or ARN of the Service Network to associate. You must use the ARN if the Service Network and VPC resources are in different AWS Accounts.
-  - `security_group_ids          = (Optional|list(string)) The IDs of the security groups to attach to the association.
-  - `tags` =                     = (Optional|map(string)) Tags to set on the Lattice VPC association resource.
-EOF
-  type        = any
-
-  default = {}
-
-  # All var.vpc_lattice valid keys
-  validation {
-    error_message = "Invalid key in var.vpc_lattice. Valid options include: \"service_network_identifier\", \"security_group_ids\", \"tags\"."
-    condition = length(setsubtract(keys(var.vpc_lattice), [
-      "service_network_identifier",
-      "security_group_ids",
-      "tags"
-    ])) == 0
-  }
 }

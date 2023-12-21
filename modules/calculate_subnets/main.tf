@@ -1,6 +1,6 @@
 locals {
   # group subnets by type and create names for each type
-  type_grouped_named_subnets_to_build = { for name, subnet_definition in var.subnets : name => [for _, az in var.azs : "${name}/${az}"] }
+  type_grouped_named_subnets_to_build = { for name, subnet_definition in var.subnets : name => [for _, az in try(subnet_definition.azs, var.azs) : "${name}/${az}"] }
   # which network groups require calculating subnet
   types_to_calculate = [for type, subnet_definition in var.subnets : type if can(subnet_definition.netmask)]
   types_ipv6_native  = [for type, subnet_definition in var.subnets : type if can(subnet_definition.ipv6_native)]
@@ -17,7 +17,7 @@ locals {
   ]])
 
   # map of explicit cidrs to az
-  explicit_cidrs_grouped = { for _, type in local.types_with_explicit : type => zipmap(var.azs, var.subnets[type].cidrs[*]) }
+  explict_cidrs_grouped = { for _, type in local.types_with_explicit : type => zipmap(try(var.subnets[type].azs, var.azs, ), var.subnets[type].cidrs[*]) }
 }
 
 module "subnet_calculator" {
